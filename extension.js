@@ -18,6 +18,8 @@ export default class GrayscaleToggleExtension extends Extension {
         this._mag = Gio.Settings.new('org.gnome.desktop.a11y.magnifier');
         this._prefs = this.getSettings();
         this._animSource = null;
+        this._scheduleSource = null;
+        this._scheduleActive = null;
 
         const icon = new St.Icon({
             icon_name: 'preferences-desktop-accessibility-symbolic',
@@ -54,17 +56,19 @@ export default class GrayscaleToggleExtension extends Extension {
         this._prefs.connectObject('changed::start-hour', () => this._applySchedule(), this);
         this._prefs.connectObject('changed::end-hour', () => this._applySchedule(), this);
         this._prefs.connectObject('changed::enable-schedule', () => this._applySchedule(), this);
+        this._prefs.connectObject('changed::start-minute', () => this._applySchedule(), this);
+        this._prefs.connectObject('changed::end-minute', () => this._applySchedule(), this);
 
         this._sync();
         this._syncSlider();
         this._applySchedule();
-        this._persistSaturation();
 
         Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator, 1);
     }
 
     disable() {
         this._cancelAnimation();
+        this._stopScheduleTimer();
         this._a11y.disconnectObject(this);
         this._mag.disconnectObject(this);
         this._prefs.disconnectObject(this);
@@ -92,7 +96,6 @@ export default class GrayscaleToggleExtension extends Extension {
             let strength = Math.round(this._menuSlider.value * 100);
             strength = Math.max(0, Math.min(100, strength));
             this._prefs.set_int('strength', strength);
-            this._persistSaturation();
             if (this._a11y.get_boolean('screen-magnifier-enabled'))
                 this._apply(true);
         });
@@ -214,22 +217,48 @@ export default class GrayscaleToggleExtension extends Extension {
         if (this._scheduleSwitch)
             this._scheduleSwitch.state = enabled;
 
-        if (enabled) {
-            const script = `${GLib.get_home_dir()}/.local/bin/set-grayscale-schedule.sh`;
-            const start = this._fmtTimeFromPrefs('start-hour', 'start-minute');
-            const end = this._fmtTimeFromPrefs('end-hour', 'end-minute');
-            this._spawn(['bash', '-c', `${script} '${start}' '${end}'`]);
-        } else {
-            this._spawn(['systemctl', '--user', 'stop', 'grayscale-on.timer', 'grayscale-off.timer']);
-        }
+        if (enabled)
+            this._startScheduleTimer();
+        else
+            this._stopScheduleTimer();
     }
 
-    _spawn(argv) {
-        try {
-            Gio.Subprocess.new(argv, Gio.SubprocessFlags.NONE);
-        } catch (e) {
-            console.warn(`grayscale-toggle: no pude ejecutar ${argv[0]}: ${e}`);
+    _startScheduleTimer() {
+        if (this._scheduleSource)
+            return;
+        this._scheduleActive = this._a11y.get_boolean('screen-magnifier-enabled');
+        this._tickSchedule();
+        this._scheduleSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60000,
+            () => this._tickSchedule());
+    }
+
+    _stopScheduleTimer() {
+        if (this._scheduleSource) {
+            GLib.source_remove(this._scheduleSource);
+            this._scheduleSource = null;
         }
+        this._scheduleActive = null;
+    }
+
+    // ponytail: tick de 60s en transiciones; si se quiere precisión de segundo
+    // se re-arma un timeout para el próximo borde de la ventana.
+    _tickSchedule() {
+        const active = this._prefs.get_boolean('enable-schedule') && this._inScheduleWindow();
+        if (active !== this._scheduleActive) {
+            this._scheduleActive = active;
+            this._apply(active);
+        }
+        return GLib.SOURCE_CONTINUE;
+    }
+
+    _inScheduleWindow() {
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const start = this._prefs.get_int('start-hour') * 60 + this._prefs.get_int('start-minute');
+        const end = this._prefs.get_int('end-hour') * 60 + this._prefs.get_int('end-minute');
+        return start < end
+            ? nowMin >= start && nowMin < end
+            : nowMin >= start || nowMin < end;
     }
 
     _apply(on) {
@@ -242,7 +271,6 @@ export default class GrayscaleToggleExtension extends Extension {
                 this._mag.set_double('mag-factor', 1.0);
             }
             const target = on ? this._targetSaturation() : 1.0;
-            this._persistSaturation();
             this._animateSaturation(this._mag.get_double('color-saturation'), target,
                 () => {
                     if (!on)
@@ -255,16 +283,6 @@ export default class GrayscaleToggleExtension extends Extension {
 
     _targetSaturation() {
         return (100 - this._prefs.get_int('strength')) / 100;
-    }
-
-    _persistSaturation() {
-        try {
-            const conf = `${GLib.get_home_dir()}/.config/grayscale-toggle.conf`;
-            GLib.mkdir_with_parents(`${GLib.get_home_dir()}/.config`, 0o755);
-            GLib.file_set_contents(conf, `saturation=${this._targetSaturation()}\n`);
-        } catch (e) {
-            console.warn(`grayscale-toggle: no pude guardar la intensidad: ${e}`);
-        }
     }
 
     _animateSaturation(from, to, done) {
