@@ -21,6 +21,8 @@ export default class GrayscaleToggleExtension extends Extension {
         this._clock24 = this._desktop.get_string('clock-format') === '24h';
         this._animSource = null;
         this._animSeq = 0;
+        this._animTarget = null;
+        this._intendedOn = this._a11y.get_boolean('screen-magnifier-enabled');
         this._scheduleSource = null;
         this._scheduleActive = null;
         this._unitLabels = {};
@@ -34,7 +36,7 @@ export default class GrayscaleToggleExtension extends Extension {
         });
         icon.connect('button-press-event', (actor, event) => {
             if (event.get_button() === 1) {
-                this._apply(!this._a11y.get_boolean('screen-magnifier-enabled'));
+                this._apply(!this._intendedOn);
                 return Clutter.EVENT_STOP;
             }
             return Clutter.EVENT_PROPAGATE;
@@ -81,11 +83,13 @@ export default class GrayscaleToggleExtension extends Extension {
 
     disable() {
         this._cancelAnimation();
+        this._finalizeAnimation();
         this._stopScheduleTimer();
         this._a11y.disconnectObject(this);
         this._mag.disconnectObject(this);
         this._prefs.disconnectObject(this);
         this._desktop.disconnectObject(this);
+        this._toggle?.destroy();
         this._indicator?.destroy();
         this._indicator = null;
         this._toggle = null;
@@ -311,6 +315,7 @@ export default class GrayscaleToggleExtension extends Extension {
         if (this._applying)
             return;
         this._applying = true;
+        this._intendedOn = on;
         try {
             if (on) {
                 this._a11y.set_boolean('screen-magnifier-enabled', true);
@@ -334,7 +339,9 @@ export default class GrayscaleToggleExtension extends Extension {
 
     _animateSaturation(from, to, durationMs, done) {
         this._cancelAnimation();
+        this._animTarget = to;
         if (from === to) {
+            this._animTarget = null;
             if (done)
                 done();
             this._sync();
@@ -355,6 +362,7 @@ export default class GrayscaleToggleExtension extends Extension {
                 this._mag.set_double('color-saturation', v);
                 if (i >= steps) {
                     this._animSource = null;
+                    this._animTarget = null;
                     if (done)
                         done();
                     this._sync();
@@ -372,11 +380,24 @@ export default class GrayscaleToggleExtension extends Extension {
         }
     }
 
+    _finalizeAnimation() {
+        if (this._animTarget === null)
+            return;
+        const target = this._animTarget;
+        this._cancelAnimation();
+        this._animTarget = null;
+        this._mag.set_double('color-saturation', target);
+        if (target === 1.0)
+            this._a11y.set_boolean('screen-magnifier-enabled', false);
+    }
+
     _sync() {
         if (this._animSource)
             return;
+        const on = this._a11y.get_boolean('screen-magnifier-enabled');
+        this._intendedOn = on;
         this._toggle.block_signal_handler(this._checkedId);
-        this._toggle.checked = this._a11y.get_boolean('screen-magnifier-enabled');
+        this._toggle.checked = on;
         this._toggle.unblock_signal_handler(this._checkedId);
     }
 
