@@ -15,14 +15,14 @@ export default class GrayscaleTogglePreferences extends ExtensionPreferences {
         window.add(page);
 
         const scheduleGroup = new Adw.PreferencesGroup({
-            title: _('Horario'),
-            description: _('Cuándo se activa y desactiva la escala de grises automáticamente'),
+            title: _('Schedule'),
+            description: _('When grayscale turns on and off automatically'),
         });
         page.add(scheduleGroup);
 
         const scheduleToggle = new Adw.SwitchRow({
-            title: _('Usar horario'),
-            subtitle: _('Activa la escala de grises a la hora de inicio y la desactiva a la hora de fin'),
+            title: _('Use schedule'),
+            subtitle: _('Turns grayscale on at the start time and off at the end time'),
         });
         settings.bind('enable-schedule', scheduleToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         scheduleGroup.add(scheduleToggle);
@@ -34,20 +34,20 @@ export default class GrayscaleTogglePreferences extends ExtensionPreferences {
             return false;
         });
 
-        scheduleGroup.add(this._buildTimeRow(_('Inicio'),
-            _('Hora a la que se activa el modo'), settings, 'start-hour', 'start-minute', ids));
-        scheduleGroup.add(this._buildTimeRow(_('Fin'),
-            _('Hora a la que se desactiva el modo'), settings, 'end-hour', 'end-minute', ids));
+        scheduleGroup.add(this._buildTimeRow(_('Start'),
+            _('Time at which the mode turns on'), settings, 'start-hour', 'start-minute', ids));
+        scheduleGroup.add(this._buildTimeRow(_('End'),
+            _('Time at which the mode turns off'), settings, 'end-hour', 'end-minute', ids));
 
         const intensityGroup = new Adw.PreferencesGroup({
-            title: _('Intensidad'),
-            description: _('Qué tan fuerte es el efecto de escala de grises'),
+            title: _('Intensity'),
+            description: _('How strong the grayscale effect is'),
         });
         page.add(intensityGroup);
 
         const strengthRow = new Adw.ActionRow({
-            title: _('Escala de grises'),
-            subtitle: _('100 es gris total, menor valor es una desaturación parcial'),
+            title: _('Grayscale'),
+            subtitle: _('100 is full grayscale; lower values are partial desaturation'),
         });
         const scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1);
         scale.valign = Gtk.Align.CENTER;

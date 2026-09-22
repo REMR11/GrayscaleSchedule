@@ -30,7 +30,7 @@ export default class GrayscaleToggleExtension extends Extension {
             icon_name: 'preferences-desktop-accessibility-symbolic',
             style_class: 'system-status-icon',
             reactive: true,
-            accessible_name: this.gettext('Escala de grises'),
+            accessible_name: this.gettext('Grayscale'),
         });
         icon.connect('button-press-event', (actor, event) => {
             if (event.get_button() === 1) {
@@ -45,7 +45,7 @@ export default class GrayscaleToggleExtension extends Extension {
         this._indicator.visible = true;
 
         this._toggle = new QuickSettings.QuickMenuToggle({
-            title: this.gettext('Escala de grises'),
+            title: this.gettext('Grayscale'),
             iconName: 'preferences-desktop-accessibility-symbolic',
             toggleMode: true,
         });
@@ -101,9 +101,9 @@ export default class GrayscaleToggleExtension extends Extension {
             activate: false,
             can_focus: false,
         });
-        intensity.add_child(new St.Label({text: this.gettext('Intensidad')}));
+        intensity.add_child(new St.Label({text: this.gettext('Intensity')}));
         this._menuSlider = new Slider(this._prefs.get_int('strength') / 100);
-        this._menuSlider.accessible_name = this.gettext('Intensidad de grises');
+        this._menuSlider.accessible_name = this.gettext('Grayscale intensity');
         this._menuSlider.connect('notify::value', () => {
             if (this._syncingSlider)
                 return;
@@ -117,13 +117,13 @@ export default class GrayscaleToggleExtension extends Extension {
         menu.addMenuItem(this._buildScheduleRow());
 
         this._scheduleSwitch = new PopupMenu.PopupSwitchMenuItem(
-            this.gettext('Horario automático'),
+            this.gettext('Schedule'),
             this._prefs.get_boolean('enable-schedule'));
         this._scheduleSwitch.connect('toggled',
             () => this._prefs.set_boolean('enable-schedule', this._scheduleSwitch.state));
         menu.addMenuItem(this._scheduleSwitch);
 
-        menu.addAction(this.gettext('Abrir configuración'), () => this.openPreferences());
+        menu.addAction(this.gettext('Open settings'), () => this.openPreferences());
     }
 
     _buildScheduleRow() {
@@ -133,9 +133,9 @@ export default class GrayscaleToggleExtension extends Extension {
             can_focus: false,
         });
         const box = new St.BoxLayout({style: 'spacing: 12px'});
-        box.add_child(this._buildTimeField(this.gettext('Inicio'),
+        box.add_child(this._buildTimeField(this.gettext('Start'),
             'start-hour', 'start-minute'));
-        box.add_child(this._buildTimeField(this.gettext('Fin'),
+        box.add_child(this._buildTimeField(this.gettext('End'),
             'end-hour', 'end-minute'));
         row.add_child(box);
         return row;
@@ -163,7 +163,7 @@ export default class GrayscaleToggleExtension extends Extension {
                 : String(this._prefs.get_int(unitKey)).padStart(2, '0'),
             reactive: true,
             accessible_name: `${title} ${unitKey.endsWith('-hour')
-                ? this.gettext('hora') : this.gettext('minuto')}. ${this.gettext('Clic para sumar 1')}`,
+                ? this.gettext('hour') : this.gettext('minute')}. ${this.gettext('Click to add 1')}`,
         });
         this._unitLabels[unitKey] = label;
         label.connect('button-press-event', (actor, event) => {
@@ -236,12 +236,12 @@ export default class GrayscaleToggleExtension extends Extension {
     _updateHeader() {
         const enabled = this._prefs.get_boolean('enable-schedule');
         const subtitle = enabled
-            ? this.gettext('Horario: %s – %s').format(
+            ? this.gettext('Schedule: %s – %s').format(
                 this._fmtTimeFromPrefs('start-hour', 'start-minute'),
                 this._fmtTimeFromPrefs('end-hour', 'end-minute'))
-            : this.gettext('Sin horario');
+            : this.gettext('No schedule');
         this._toggle.menu.setHeader('preferences-desktop-accessibility-symbolic',
-            this.gettext('Escala de grises'), subtitle);
+            this.gettext('Grayscale'), subtitle);
     }
 
     _applySchedule() {

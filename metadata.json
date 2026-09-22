@@ -1,8 +1,9 @@
 {
-  "uuid": "grayscale-toggle@local",
-  "name": "Grayscale Toggle",
-  "description": "Toggle de escala de grises en Quick Settings con horario programable e intensidad ajustable",
+  "uuid": "grayscale-schedule@remr11.github.com",
+  "name": "Grayscale Schedule",
+  "description": "Toggle grayscale in Quick Settings with a schedule (start/end times and intensity)",
   "shell-version": ["50"],
   "settings-schema": "org.gnome.shell.extensions.grayscale-toggle",
-  "version-name": "1.1"
+  "gettext-domain": "grayscale-schedule",
+  "url": "https://github.com/REMR11/GrayscaleSchedule"
 }
