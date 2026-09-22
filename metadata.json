@@ -1,0 +1,8 @@
+{
+  "uuid": "grayscale-toggle@local",
+  "name": "Grayscale Toggle",
+  "description": "Toggle de escala de grises en Quick Settings con horario programable e intensidad ajustable",
+  "shell-version": ["50"],
+  "settings-schema": "org.gnome.shell.extensions.grayscale-toggle",
+  "version-name": "1.1"
+}

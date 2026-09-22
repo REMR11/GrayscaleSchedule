@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.grayscale-toggle"
+          path="/org/gnome/shell/extensions/grayscale-toggle/">
+    <key name="enable-schedule" type="b">
+      <default>true</default>
+      <summary>Use a schedule</summary>
+      <description>Whether grayscale should turn on and off automatically at the configured times</description>
+    </key>
+    <key name="start-hour" type="i">
+      <default>21</default>
+      <range min="0" max="23"/>
+      <summary>Start hour of the schedule</summary>
+      <description>Hour at which grayscale turns on automatically</description>
+    </key>
+    <key name="end-hour" type="i">
+      <default>5</default>
+      <range min="0" max="23"/>
+      <summary>End hour of the schedule</summary>
+      <description>Hour at which grayscale turns off automatically</description>
+    </key>
+    <key name="start-minute" type="i">
+      <default>0</default>
+      <range min="0" max="59"/>
+      <summary>Start minute of the schedule</summary>
+      <description>Minute at which grayscale turns on automatically</description>
+    </key>
+    <key name="end-minute" type="i">
+      <default>0</default>
+      <range min="0" max="59"/>
+      <summary>End minute of the schedule</summary>
+      <description>Minute at which grayscale turns off automatically</description>
+    </key>
+    <key name="strength" type="i">
+      <default>100</default>
+      <range min="0" max="100"/>
+      <summary>Grayscale intensity</summary>
+      <description>How strong the grayscale effect is, where 100 is full grayscale and 0 has no effect</description>
+    </key>
+  </schema>
+</schemalist>
