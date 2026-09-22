@@ -276,8 +276,7 @@ export default class GrayscaleToggleExtension extends Extension {
         if (this._scheduleSource)
             return;
         this._scheduleActive = this._a11y.get_boolean('screen-magnifier-enabled');
-        this._scheduleSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60000,
-            () => this._tickSchedule());
+        this._armScheduleTick();
     }
 
     _stopScheduleTimer() {
@@ -288,8 +287,16 @@ export default class GrayscaleToggleExtension extends Extension {
         this._scheduleActive = null;
     }
 
-    // ponytail: tick de 60s en transiciones; si se quiere precisión de segundo
-    // se re-arma un timeout para el próximo borde de la ventana.
+    _armScheduleTick() {
+        this._scheduleSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
+            (60 - new Date().getSeconds()) * 1000, () => {
+                this._scheduleSource = null;
+                this._tickSchedule();
+                this._armScheduleTick();
+                return GLib.SOURCE_REMOVE;
+            });
+    }
+
     _tickSchedule() {
         const active = this._prefs.get_boolean('enable-schedule') && this._inScheduleWindow();
         if (active !== this._scheduleActive) {
@@ -387,15 +394,15 @@ export default class GrayscaleToggleExtension extends Extension {
         this._cancelAnimation();
         this._animTarget = null;
         this._mag.set_double('color-saturation', target);
-        if (target === 1.0)
+        if (!this._intendedOn)
             this._a11y.set_boolean('screen-magnifier-enabled', false);
     }
 
     _sync() {
-        if (this._animSource)
-            return;
         const on = this._a11y.get_boolean('screen-magnifier-enabled');
         this._intendedOn = on;
+        if (this._animSource)
+            return;
         this._toggle.block_signal_handler(this._checkedId);
         this._toggle.checked = on;
         this._toggle.unblock_signal_handler(this._checkedId);

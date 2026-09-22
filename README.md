@@ -28,6 +28,17 @@ gnome-extensions install dist/grayscale-schedule@remr11.github.com.shell-extensi
 gnome-extensions enable grayscale-schedule@remr11.github.com
 ```
 
+Installing from a source checkout instead of the packed zip needs the compiled
+translations first:
+
+```sh
+mkdir -p locale/es/LC_MESSAGES
+msgfmt po/es.po -o locale/es/LC_MESSAGES/grayscale-schedule.mo
+```
+
+The `locale/` directory is gitignored (build output); the zip built with
+`--gettext-domain` already contains it.
+
 ### From extensions.gnome.org
 
 Install from the [extensions.gnome.org](https://extensions.gnome.org) page (once published).
