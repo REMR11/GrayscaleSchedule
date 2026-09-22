@@ -18,6 +18,7 @@ export default class GrayscaleToggleExtension extends Extension {
         this._mag = Gio.Settings.new('org.gnome.desktop.a11y.magnifier');
         this._prefs = this.getSettings();
         this._animSource = null;
+        this._animSeq = 0;
         this._scheduleSource = null;
         this._scheduleActive = null;
         this._unitLabels = {};
@@ -283,8 +284,9 @@ export default class GrayscaleToggleExtension extends Extension {
                 this._mag.set_double('mag-factor', 1.0);
             }
             const target = on ? this._targetSaturation() : 1.0;
+            const duration = on ? 2000 : 1000;
             this._animateSaturation(this._mag.get_double('color-saturation'), target,
-                () => {
+                duration, () => {
                     if (!on)
                         this._a11y.set_boolean('screen-magnifier-enabled', false);
                 });
@@ -297,31 +299,36 @@ export default class GrayscaleToggleExtension extends Extension {
         return (100 - this._prefs.get_int('strength')) / 100;
     }
 
-    _animateSaturation(from, to, done) {
+    _animateSaturation(from, to, durationMs, done) {
+        this._cancelAnimation();
         if (from === to) {
             if (done)
                 done();
             return;
         }
-        this._cancelAnimation();
-        const steps = Math.max(1, Math.round(Math.abs(to - from) / 0.02));
-        const interval = 40;
+        const animId = ++this._animSeq;
+        const steps = Math.max(1, Math.round(durationMs / 16));
         const delta = (to - from) / steps;
         let i = 0;
-        this._animSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, interval, () => {
-            i++;
-            this._mag.set_double('color-saturation', i >= steps ? to : from + delta * i);
-            if (i >= steps) {
-                this._animSource = null;
-                if (done)
-                    done();
-                return GLib.SOURCE_REMOVE;
-            }
-            return GLib.SOURCE_CONTINUE;
-        });
+        this._animSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
+            Math.round(durationMs / steps), () => {
+                if (this._animSeq !== animId)
+                    return GLib.SOURCE_REMOVE;
+                i++;
+                const v = i >= steps ? to : from + delta * i;
+                this._mag.set_double('color-saturation', v);
+                if (i >= steps) {
+                    this._animSource = null;
+                    if (done)
+                        done();
+                    return GLib.SOURCE_REMOVE;
+                }
+                return GLib.SOURCE_CONTINUE;
+            });
     }
 
     _cancelAnimation() {
+        this._animSeq++;
         if (this._animSource) {
             GLib.source_remove(this._animSource);
             this._animSource = null;
