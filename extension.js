@@ -17,11 +17,14 @@ export default class GrayscaleToggleExtension extends Extension {
         this._a11y = Gio.Settings.new('org.gnome.desktop.a11y.applications');
         this._mag = Gio.Settings.new('org.gnome.desktop.a11y.magnifier');
         this._prefs = this.getSettings();
+        this._desktop = Gio.Settings.new('org.gnome.desktop.interface');
+        this._clock24 = this._desktop.get_string('clock-format') === '24h';
         this._animSource = null;
         this._animSeq = 0;
         this._scheduleSource = null;
         this._scheduleActive = null;
         this._unitLabels = {};
+        this._ampmLabels = {};
 
         const icon = new St.Icon({
             icon_name: 'preferences-desktop-accessibility-symbolic',
@@ -60,6 +63,10 @@ export default class GrayscaleToggleExtension extends Extension {
         this._prefs.connectObject('changed::enable-schedule', () => this._applySchedule(), this);
         this._prefs.connectObject('changed::start-minute', () => this._applySchedule(), this);
         this._prefs.connectObject('changed::end-minute', () => this._applySchedule(), this);
+        this._desktop.connectObject('changed::clock-format', () => {
+            this._clock24 = this._desktop.get_string('clock-format') === '24h';
+            this._applySchedule();
+        }, this);
 
         this._sync();
         this._syncSlider();
@@ -74,6 +81,7 @@ export default class GrayscaleToggleExtension extends Extension {
         this._a11y.disconnectObject(this);
         this._mag.disconnectObject(this);
         this._prefs.disconnectObject(this);
+        this._desktop.disconnectObject(this);
         this._indicator?.destroy();
         this._indicator = null;
         this._toggle = null;
@@ -137,6 +145,8 @@ export default class GrayscaleToggleExtension extends Extension {
         box.add_child(this._buildSegment(title, hourKey));
         box.add_child(new St.Label({text: ':'}));
         box.add_child(this._buildSegment(title, minuteKey));
+        this._ampmLabels[hourKey] = new St.Label({text: ''});
+        box.add_child(this._ampmLabels[hourKey]);
         return box;
     }
 
@@ -146,7 +156,9 @@ export default class GrayscaleToggleExtension extends Extension {
             style: 'spacing: 1px',
         });
         const label = new St.Label({
-            text: String(this._prefs.get_int(unitKey)).padStart(2, '0'),
+            text: unitKey.endsWith('-hour')
+                ? this._fmtHour(this._prefs.get_int(unitKey))
+                : String(this._prefs.get_int(unitKey)).padStart(2, '0'),
             reactive: true,
             accessible_name: `${title} ${unitKey.endsWith('-hour')
                 ? this.gettext('hora') : this.gettext('minuto')}. ${this.gettext('Clic para sumar 1')}`,
@@ -199,12 +211,23 @@ export default class GrayscaleToggleExtension extends Extension {
         this._prefs.set_int(unitKey, m);
     }
 
-    _fmtTime(h, m) {
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    _fmtHour(h) {
+        if (this._clock24)
+            return String(h).padStart(2, '0');
+        return String(h % 12 || 12).padStart(2, '0');
+    }
+
+    _ampmFor(h) {
+        return this._clock24 ? '' : (h < 12 ? 'AM' : 'PM');
+    }
+
+    _fmtDisplayTime(h, m) {
+        const t = `${this._fmtHour(h)}:${String(m).padStart(2, '0')}`;
+        return this._clock24 ? t : `${t} ${this._ampmFor(h)}`;
     }
 
     _fmtTimeFromPrefs(hourKey, minuteKey) {
-        return this._fmtTime(this._prefs.get_int(hourKey),
+        return this._fmtDisplayTime(this._prefs.get_int(hourKey),
             this._prefs.get_int(minuteKey));
     }
 
@@ -224,8 +247,13 @@ export default class GrayscaleToggleExtension extends Extension {
         this._updateHeader();
 
         if (this._unitLabels) {
-            for (const key of Object.keys(this._unitLabels))
-                this._unitLabels[key].text = String(this._prefs.get_int(key)).padStart(2, '0');
+            for (const key of Object.keys(this._unitLabels)) {
+                const value = this._prefs.get_int(key);
+                this._unitLabels[key].text = key.endsWith('-hour')
+                    ? this._fmtHour(value) : String(value).padStart(2, '0');
+            }
+            for (const key of Object.keys(this._ampmLabels))
+                this._ampmLabels[key].text = this._ampmFor(this._prefs.get_int(key));
         }
         if (this._scheduleSwitch)
             this._scheduleSwitch.state = enabled;
