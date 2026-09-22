@@ -27,10 +27,17 @@ export default class GrayscaleTogglePreferences extends ExtensionPreferences {
         settings.bind('enable-schedule', scheduleToggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         scheduleGroup.add(scheduleToggle);
 
+        const ids = [];
+        window.connect('close-request', () => {
+            for (const id of ids)
+                settings.disconnect(id);
+            return false;
+        });
+
         scheduleGroup.add(this._buildTimeRow(_('Inicio'),
-            _('Hora a la que se activa el modo'), settings, 'start-hour', 'start-minute'));
+            _('Hora a la que se activa el modo'), settings, 'start-hour', 'start-minute', ids));
         scheduleGroup.add(this._buildTimeRow(_('Fin'),
-            _('Hora a la que se desactiva el modo'), settings, 'end-hour', 'end-minute'));
+            _('Hora a la que se desactiva el modo'), settings, 'end-hour', 'end-minute', ids));
 
         const intensityGroup = new Adw.PreferencesGroup({
             title: _('Intensidad'),
@@ -50,7 +57,7 @@ export default class GrayscaleTogglePreferences extends ExtensionPreferences {
         intensityGroup.add(strengthRow);
     }
 
-    _buildTimeRow(title, subtitle, settings, hourKey, minuteKey) {
+    _buildTimeRow(title, subtitle, settings, hourKey, minuteKey, ids) {
         const row = new Adw.ActionRow({title, subtitle});
 
         const fmt = total =>
@@ -87,8 +94,8 @@ export default class GrayscaleTogglePreferences extends ExtensionPreferences {
         });
 
         const updateSpin = () => spin.set_value(toTotal());
-        settings.connect(`changed::${hourKey}`, updateSpin);
-        settings.connect(`changed::${minuteKey}`, updateSpin);
+        ids.push(settings.connect(`changed::${hourKey}`, updateSpin));
+        ids.push(settings.connect(`changed::${minuteKey}`, updateSpin));
 
         row.add_suffix(spin);
         return row;

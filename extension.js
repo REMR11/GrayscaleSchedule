@@ -57,7 +57,11 @@ export default class GrayscaleToggleExtension extends Extension {
 
         this._a11y.connectObject('changed::screen-magnifier-enabled', () => this._sync(), this);
         this._mag.connectObject('changed::color-saturation', () => this._sync(), this);
-        this._prefs.connectObject('changed::strength', () => this._syncSlider(), this);
+        this._prefs.connectObject('changed::strength', () => {
+            this._syncSlider();
+            if (this._a11y.get_boolean('screen-magnifier-enabled'))
+                this._apply(true);
+        }, this);
         this._prefs.connectObject('changed::start-hour', () => this._applySchedule(), this);
         this._prefs.connectObject('changed::end-hour', () => this._applySchedule(), this);
         this._prefs.connectObject('changed::enable-schedule', () => this._applySchedule(), this);
@@ -106,8 +110,6 @@ export default class GrayscaleToggleExtension extends Extension {
             let strength = Math.round(this._menuSlider.value * 100);
             strength = Math.max(0, Math.min(100, strength));
             this._prefs.set_int('strength', strength);
-            if (this._a11y.get_boolean('screen-magnifier-enabled'))
-                this._apply(true);
         });
         intensity.add_child(this._menuSlider);
         menu.addMenuItem(intensity);
@@ -258,17 +260,18 @@ export default class GrayscaleToggleExtension extends Extension {
         if (this._scheduleSwitch)
             this._scheduleSwitch.state = enabled;
 
-        if (enabled)
+        if (enabled) {
             this._startScheduleTimer();
-        else
+            this._tickSchedule();
+        } else {
             this._stopScheduleTimer();
+        }
     }
 
     _startScheduleTimer() {
         if (this._scheduleSource)
             return;
         this._scheduleActive = this._a11y.get_boolean('screen-magnifier-enabled');
-        this._tickSchedule();
         this._scheduleSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60000,
             () => this._tickSchedule());
     }
@@ -293,10 +296,12 @@ export default class GrayscaleToggleExtension extends Extension {
     }
 
     _inScheduleWindow() {
-        const now = new Date();
-        const nowMin = now.getHours() * 60 + now.getMinutes();
         const start = this._prefs.get_int('start-hour') * 60 + this._prefs.get_int('start-minute');
         const end = this._prefs.get_int('end-hour') * 60 + this._prefs.get_int('end-minute');
+        if (start === end)
+            return false;
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
         return start < end
             ? nowMin >= start && nowMin < end
             : nowMin >= start || nowMin < end;
@@ -332,6 +337,7 @@ export default class GrayscaleToggleExtension extends Extension {
         if (from === to) {
             if (done)
                 done();
+            this._sync();
             return;
         }
         const animId = ++this._animSeq;
@@ -340,8 +346,10 @@ export default class GrayscaleToggleExtension extends Extension {
         let i = 0;
         this._animSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT,
             Math.round(durationMs / steps), () => {
-                if (this._animSeq !== animId)
+                if (this._animSeq !== animId) {
+                    this._animSource = null;
                     return GLib.SOURCE_REMOVE;
+                }
                 i++;
                 const v = i >= steps ? to : from + delta * i;
                 this._mag.set_double('color-saturation', v);
@@ -349,6 +357,7 @@ export default class GrayscaleToggleExtension extends Extension {
                     this._animSource = null;
                     if (done)
                         done();
+                    this._sync();
                     return GLib.SOURCE_REMOVE;
                 }
                 return GLib.SOURCE_CONTINUE;
