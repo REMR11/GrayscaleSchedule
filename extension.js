@@ -20,6 +20,7 @@ export default class GrayscaleToggleExtension extends Extension {
         this._animSource = null;
         this._scheduleSource = null;
         this._scheduleActive = null;
+        this._unitLabels = {};
 
         const icon = new St.Icon({
             icon_name: 'preferences-desktop-accessibility-symbolic',
@@ -130,29 +131,34 @@ export default class GrayscaleToggleExtension extends Extension {
     }
 
     _buildTimeField(title, hourKey, minuteKey) {
-        const box = new St.BoxLayout({style: 'spacing: 4px'});
+        const box = new St.BoxLayout({style: 'spacing: 6px'});
         box.add_child(new St.Label({text: title}));
+        box.add_child(this._buildSegment(title, hourKey));
+        box.add_child(new St.Label({text: ':'}));
+        box.add_child(this._buildSegment(title, minuteKey));
+        return box;
+    }
 
-        const timeLabel = new St.Label({
-            text: this._fmtTimeFromPrefs(hourKey, minuteKey),
-            reactive: true,
-            accessible_name: `${title}. ${this.gettext('Clic para sumar una hora')}`,
+    _buildSegment(title, unitKey) {
+        const box = new St.BoxLayout({
+            orientation: Clutter.Orientation.VERTICAL,
+            style: 'spacing: 1px',
         });
-        if (hourKey === 'start-hour')
-            this._startTimeLabel = timeLabel;
-        else
-            this._endTimeLabel = timeLabel;
-        timeLabel.connect('button-press-event', (actor, event) => {
+        const label = new St.Label({
+            text: String(this._prefs.get_int(unitKey)).padStart(2, '0'),
+            reactive: true,
+            accessible_name: `${title} ${unitKey.endsWith('-hour')
+                ? this.gettext('hora') : this.gettext('minuto')}. ${this.gettext('Clic para sumar 1')}`,
+        });
+        this._unitLabels[unitKey] = label;
+        label.connect('button-press-event', (actor, event) => {
             if (event.get_button() === 1) {
-                this._prefs.set_int(hourKey, (this._prefs.get_int(hourKey) + 1) % 24);
+                this._adjustUnit(unitKey, 1);
                 return Clutter.EVENT_STOP;
             }
             return Clutter.EVENT_PROPAGATE;
         });
 
-        const arrows = new St.BoxLayout({
-            orientation: Clutter.Orientation.VERTICAL,
-        });
         const mkArrow = (iconName, delta) => {
             const btn = new St.Button({
                 style_class: 'icon-button',
@@ -163,27 +169,33 @@ export default class GrayscaleToggleExtension extends Extension {
                 reactive: true,
                 can_focus: true,
             });
-            btn.connect('clicked', () => {
-                let h = this._prefs.get_int(hourKey);
-                let m = this._prefs.get_int(minuteKey) + delta;
-                if (m < 0) {
-                    m = 59;
-                    h = (h + 23) % 24;
-                } else if (m > 59) {
-                    m = 0;
-                    h = (h + 1) % 24;
-                }
-                this._prefs.set_int(hourKey, h);
-                this._prefs.set_int(minuteKey, m);
-            });
+            btn.connect('clicked', () => this._adjustUnit(unitKey, delta));
             return btn;
         };
-        arrows.add_child(mkArrow('pan-up-symbolic', 1));
-        arrows.add_child(mkArrow('pan-down-symbolic', -1));
-
-        box.add_child(timeLabel);
-        box.add_child(arrows);
+        box.add_child(label);
+        box.add_child(mkArrow('pan-up-symbolic', 1));
+        box.add_child(mkArrow('pan-down-symbolic', -1));
         return box;
+    }
+
+    _adjustUnit(unitKey, delta) {
+        const current = this._prefs.get_int(unitKey);
+        if (unitKey.endsWith('-hour')) {
+            this._prefs.set_int(unitKey, (current + delta + 24) % 24);
+            return;
+        }
+        const hourKey = unitKey.replace('-minute', '-hour');
+        let h = this._prefs.get_int(hourKey);
+        let m = current + delta;
+        if (m < 0) {
+            m = 59;
+            h = (h + 23) % 24;
+        } else if (m > 59) {
+            m = 0;
+            h = (h + 1) % 24;
+        }
+        this._prefs.set_int(hourKey, h);
+        this._prefs.set_int(unitKey, m);
     }
 
     _fmtTime(h, m) {
@@ -210,9 +222,9 @@ export default class GrayscaleToggleExtension extends Extension {
         const enabled = this._prefs.get_boolean('enable-schedule');
         this._updateHeader();
 
-        if (this._startTimeLabel) {
-            this._startTimeLabel.text = this._fmtTimeFromPrefs('start-hour', 'start-minute');
-            this._endTimeLabel.text = this._fmtTimeFromPrefs('end-hour', 'end-minute');
+        if (this._unitLabels) {
+            for (const key of Object.keys(this._unitLabels))
+                this._unitLabels[key].text = String(this._prefs.get_int(key)).padStart(2, '0');
         }
         if (this._scheduleSwitch)
             this._scheduleSwitch.state = enabled;
